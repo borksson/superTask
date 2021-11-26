@@ -176,8 +176,8 @@ public class Function {
         try {
             Function func = new Function("4+4-2/3*x^2", null);
             System.out.println(func.toString());
-            Function funcPrime = func.derivative();
-            System.out.println(funcPrime.toString());
+            //Function funcPrime = func.derivative();
+            //System.out.println(funcPrime.toString());
         } catch (Exception e) {
             e.printStackTrace();
         }
