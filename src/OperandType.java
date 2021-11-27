@@ -3,6 +3,5 @@ public enum OperandType {
     SUBTRACT,
     MULTIPLY,
     DIVIDE,
-    POWER,
-    DELIMITER
+    POWER
 }

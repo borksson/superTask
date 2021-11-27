@@ -1,14 +1,12 @@
+import java.rmi.server.ExportException;
 import java.text.CharacterIterator;
-import java.util.ArrayList;
-import java.util.Stack;
+import java.util.*;
 import java.text.*;
 
 public class Function {
-    String ifFunctionStr;
-    String pfFunctionStr;
-    ArrayList<String> varList = new ArrayList<String>();
-    //Post fix notation
-    ArrayList<Term> termList = new ArrayList<Term>();
+    ArrayList<TermType> NEG_PRETERMS = new ArrayList<TermType>(Arrays.asList(TermType.LEFT_PAREN, TermType.RIGHT_PAREN, TermType.OPERATOR));
+    String ifFunctionStr = null;
+    ArrayList<Term> pfTermList = new ArrayList<Term>();
 
     private int precedence(Character ch){
         if(ch == '+' || ch == '-'){
@@ -25,159 +23,138 @@ public class Function {
         }
     }
 
-    private String postFixToInFix(String postfix) {
-        StringBuilder inFix = new StringBuilder();
-        Stack<Character> stk = new Stack<Character>();
-        for(CharacterIterator it = new StringCharacterIterator(postfix); it.current() != CharacterIterator.DONE; it.next()) {
-            if(Character.isLetterOrDigit(it.current())){
-                stk.push(it.current());
-            }
-            else{
-                inFix.append("(").append(stk.peek()).append(it.current());
-                stk.pop();
-                inFix.append(stk.peek()).append(")");
-                stk.pop();
-            }
-        }
-        return inFix.toString();
-    }
-
-    private String infixToPostFix(String infix) {
-        Stack<Character> stk = new Stack<Character>();
-        stk.push('#');
-        StringBuilder postfix = new StringBuilder();
-
-        for (CharacterIterator it = new StringCharacterIterator(infix); it.current() != CharacterIterator.DONE; it.next()) {
-            if (Character.isLetterOrDigit(it.current())) {
-                //TODO: Insert letters into var list
-                postfix.append(it.current());
-            }
-            //TODO: Add decimal numbers
-            else if (it.current() == '(') {
-                stk.push(it.current());
-            } else if (it.current() == '^') {
-                stk.push(it.current());
-            } else if (it.current() == ')') {
-                while (stk.peek() != '#' && stk.peek() != '(') {
-                    postfix.append(stk.peek());
+    private ArrayList<Term> inFixToPostFix(ArrayList<Term> ifTermsList){
+        ArrayList<Term> pfTermsList = new ArrayList<Term>();
+        Stack<Term> stk = new Stack<Term>();
+        stk.push(new Term("#"));
+        for (Term term : ifTermsList) {
+            if (term.getTermType() == TermType.VALUE || term.getTermType() == TermType.VARIABLE) {
+                pfTermsList.add(term);
+            } else if (term.getTermType() == TermType.LEFT_PAREN) {
+                stk.push(term);
+            } else if (term.getTermType() == TermType.RIGHT_PAREN) {
+                while (stk.peek().getTermType() != TermType.EOF && stk.peek().getTermType() != TermType.LEFT_PAREN) {
+                    pfTermsList.add(stk.peek());
                     stk.pop();
                 }
                 stk.pop();
             } else {
-                if (precedence(it.current()) <= precedence(stk.peek())) {
-                    while (stk.peek() != '#' && precedence(it.current()) <= precedence(stk.peek())) {
-                        postfix.append(stk.peek());
+                if (precedence(term.getTermStr().charAt(0)) <= precedence(stk.peek().getTermStr().charAt(0))) {
+                    while (stk.peek().getTermType() != TermType.EOF && precedence(term.getTermStr().charAt(0)) <= precedence(stk.peek().getTermStr().charAt(0))) {
+                        pfTermsList.add(stk.peek());
                         stk.pop();
                     }
                 }
-                stk.push(it.current());
+                stk.push(term);
             }
         }
-        while (stk.peek() != '#') {
-            postfix.append(stk.peek());
+        while(stk.peek().getTermType()!=TermType.EOF){
+            pfTermsList.add(stk.peek());
             stk.pop();
         }
-
-        return postfix.toString();
+        return pfTermsList;
     }
 
-    private String powerRule(String term){
-        Double valA;
-        Double valPow;
-        Character var;
-        if(Character.isLetter(term.charAt(0))){
-            //x2^
-            valA = 1.0;
-            valPow = Double.parseDouble(Character.toString(term.charAt(1)));
-            var = term.charAt(0);
-        } else{
-            //1x2^*
-            valA = Double.parseDouble(Character.toString(term.charAt(0)));
-            valPow = Double.parseDouble(Character.toString(term.charAt(2)));
-            var = term.charAt(1);
+    private ArrayList<Term> parseIfFunctionStr(String ifFunctionStr){
+        ArrayList<Term> ifTermList = new ArrayList<Term>();
+        String charStk = "";
+        //TODO: FIX NEGATIVES
+        for (CharacterIterator it = new StringCharacterIterator(ifFunctionStr); it.current() != CharacterIterator.DONE; it.next()) {
+            if(Character.isDigit(it.current())){
+                charStk += it.current();
+            }
+            else if(it.current()=='-'&&(ifTermList.isEmpty()||NEG_PRETERMS.contains(ifTermList.get(ifTermList.size()-1).getTermType()))){
+                charStk += it.current();
+            }
+            else if(Character.isLetter(it.current())){
+                Term newTerm = new Term(charStk+Character.toString(it.current()));
+                ifTermList.add(newTerm);
+            }
+            else if(it.current()=='.'){
+                charStk += it.current();
+            }
+            else if(it.current()=='('){
+                if(!charStk.isEmpty()){
+                    Term newTerm = new Term(charStk);
+                    ifTermList.add(newTerm);
+                }
+                Term newTerm = new Term(Character.toString(it.current()));
+                ifTermList.add(newTerm);
+            }
+            else if(it.current()==')'){
+                if(!charStk.isEmpty()){
+                    Term newTerm = new Term(charStk);
+                    ifTermList.add(newTerm);
+                }
+                Term newTerm = new Term(Character.toString(it.current()));
+                ifTermList.add(newTerm);
+            }
+            else{
+                Term newTerm;
+                if(!charStk.isEmpty()) {
+                    newTerm = new Term(charStk);
+                    charStk = "";
+                    ifTermList.add(newTerm);
+                }
+                newTerm = new Term(Character.toString(it.current()));
+                ifTermList.add(newTerm);
+            }
         }
-        valA = valPow*valA;
-        valPow--;
-        //TODO: Change to postfix
-        return (valA+"")+Character.toString(var)+(valPow+"")+"^*";
-    }
-
-    public String toString(){
-        String exportStr = "In-fix: ";
-        exportStr += this.ifFunctionStr;
-        exportStr += "\nPost-fix: ";
-        exportStr += this.pfFunctionStr;
-        return exportStr;
+        if(!charStk.isEmpty()) {
+            Term newTerm = new Term(charStk);
+            charStk = "";
+            ifTermList.add(newTerm);
+        }
+        return  ifTermList;
     }
 
     public double evaluate(double value){
         //TODO: evaluation based on var
         double result = 0;
         Stack<Double> stk = new Stack<Double>();
-        for(CharacterIterator it = new StringCharacterIterator(this.pfFunctionStr); it.current() != CharacterIterator.DONE; it.next()){
-            if(it.current() == 'x'){
-                stk.push(value);
+        for(Term term: this.pfTermList){
+            if(term.getTermType()==TermType.VARIABLE){
+                stk.push(term.getValue()*value);
             }
-            else if(Character.isDigit(it.current())){
-                stk.push(Double.parseDouble(Character.toString(it.current())));
+            else if(term.getTermType()==TermType.VALUE){
+                stk.push(term.getValue());
             }
             else{
                 Double operandA = stk.peek();
                 stk.pop();
                 Double operandB = stk.peek();
                 stk.pop();
-                Double operation = switch (it.current()) {
-                    case '+' -> operandB + operandA;
-                    case '-' -> operandB - operandA;
-                    case '*' -> operandB * operandA;
-                    case '/' -> operandB / operandA;
-                    case '^' -> Math.pow(operandB, operandA);
-                    default -> (double) 0;
+                Double operation = switch (term.getOperandType()) {
+                    case ADD -> operandB + operandA;
+                    case SUBTRACT -> operandB - operandA;
+                    case MULTIPLY -> operandB * operandA;
+                    case DIVIDE -> operandB / operandA;
+                    case POWER -> Math.pow(operandB, operandA);
                 };
-                System.out.printf("%f %c %f\n", operandB, it.current(), operandA);
                 stk.push(operation);
             }
         }
         return stk.peek();
     }
 
-    public Function derivative(){
-        String pfDerivative = "";
-        try {
-            pfDerivative = powerRule(this.pfFunctionStr);
-            return new Function("", pfDerivative);
-        } catch (Exception e){
-            e.printStackTrace();
-            return null;
-        }
-    };
-
-    public Function(String ifFunctionStr, String pfFunctionStr) throws Exception{
-        if(ifFunctionStr!=null){
-            this.ifFunctionStr = ifFunctionStr;
-            this.pfFunctionStr = infixToPostFix(this.ifFunctionStr);
-        }
-        else if(pfFunctionStr!=null){
-            this.pfFunctionStr = pfFunctionStr;
-            this.ifFunctionStr = postFixToInFix(this.pfFunctionStr);
-        }
-        else {
-            throw new Exception("No function string provided.");
-        }
-    }
-
-    public Function(String ifFunctionStr){
+    public void initFuncWifStr(String ifFunctionStr){
+        this.ifFunctionStr = ifFunctionStr;
         //Parse ifFunctionStr into terms
+        ArrayList<Term> ifTermsList = parseIfFunctionStr(ifFunctionStr);
         //Translate ifTermsList to pfTermsList
         //Assign to function term list
+        this.pfTermList = inFixToPostFix(ifTermsList);
+    }
+
+    public void initFuncWpfList(ArrayList<Term> pfTermList){
+        this.pfTermList = pfTermList;
     }
 
     public static void main(String[] args) {
         try {
-            Function func = new Function("4+4-2/3*x^2", null);
-            System.out.println(func.toString());
-            //Function funcPrime = func.derivative();
-            //System.out.println(funcPrime.toString());
+            Function func = new Function();
+            func.initFuncWifStr("x^2+2*x+52");
+            System.out.println(func.evaluate(4.5));
         } catch (Exception e) {
             e.printStackTrace();
         }
