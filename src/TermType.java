@@ -1,5 +1,8 @@
 public enum TermType {
     VALUE,
     VARIABLE,
-    OPERATOR
+    OPERATOR,
+    LEFT_PAREN,
+    RIGHT_PAREN,
+    EOF
 }
