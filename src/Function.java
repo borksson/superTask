@@ -1,12 +1,14 @@
-import java.rmi.server.ExportException;
 import java.text.CharacterIterator;
-import java.util.*;
-import java.text.*;
+import java.text.StringCharacterIterator;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Stack;
 
 public class Function {
-    ArrayList<TermType> NEG_PRETERMS = new ArrayList<TermType>(Arrays.asList(TermType.LEFT_PAREN, TermType.RIGHT_PAREN, TermType.OPERATOR));
-    String ifFunctionStr = null;
-    ArrayList<Term> pfTermList = new ArrayList<Term>();
+    private ArrayList<TermType> NEG_PRETERMS = new ArrayList<TermType>(Arrays.asList(TermType.LEFT_PAREN, TermType.RIGHT_PAREN, TermType.OPERATOR));
+    private String ifFunctionStr = null;
+    private ArrayList<Term> pfTermList = new ArrayList<Term>();
+    private Node funcNode;
 
     private int precedence(Character ch){
         if(ch == '+' || ch == '-'){
@@ -39,8 +41,8 @@ public class Function {
                 }
                 stk.pop();
             } else {
-                if (precedence(term.getTermStr().charAt(0)) <= precedence(stk.peek().getTermStr().charAt(0))) {
-                    while (stk.peek().getTermType() != TermType.EOF && precedence(term.getTermStr().charAt(0)) <= precedence(stk.peek().getTermStr().charAt(0))) {
+                if (precedence(term.getTerm().charAt(0)) <= precedence(stk.peek().getTerm().charAt(0))) {
+                    while (stk.peek().getTermType() != TermType.EOF && precedence(term.getTerm().charAt(0)) <= precedence(stk.peek().getTerm().charAt(0))) {
                         pfTermsList.add(stk.peek());
                         stk.pop();
                     }
@@ -58,12 +60,11 @@ public class Function {
     private ArrayList<Term> parseIfFunctionStr(String ifFunctionStr){
         ArrayList<Term> ifTermList = new ArrayList<Term>();
         String charStk = "";
-        //TODO: FIX NEGATIVES
         for (CharacterIterator it = new StringCharacterIterator(ifFunctionStr); it.current() != CharacterIterator.DONE; it.next()) {
             if(Character.isDigit(it.current())){
                 charStk += it.current();
             }
-            else if(it.current()=='-'&&(ifTermList.isEmpty()||NEG_PRETERMS.contains(ifTermList.get(ifTermList.size()-1).getTermType()))){
+            else if(it.current()=='-'&&(ifTermList.isEmpty()||(NEG_PRETERMS.contains(ifTermList.get(ifTermList.size()-1).getTermType())))&&charStk.isEmpty()){
                 charStk += it.current();
             }
             else if(Character.isLetter(it.current())){
@@ -77,6 +78,7 @@ public class Function {
                 if(!charStk.isEmpty()){
                     Term newTerm = new Term(charStk);
                     ifTermList.add(newTerm);
+                    charStk = "";
                 }
                 Term newTerm = new Term(Character.toString(it.current()));
                 ifTermList.add(newTerm);
@@ -85,6 +87,7 @@ public class Function {
                 if(!charStk.isEmpty()){
                     Term newTerm = new Term(charStk);
                     ifTermList.add(newTerm);
+                    charStk = "";
                 }
                 Term newTerm = new Term(Character.toString(it.current()));
                 ifTermList.add(newTerm);
@@ -108,8 +111,34 @@ public class Function {
         return  ifTermList;
     }
 
+    private ArrayList<Term> nodeToPfTermList(Node funcNode){
+        ArrayList<Term> pfTermList = new ArrayList<Term>();
+        //Right/left operand
+        Stack<Node> nodeStkB = (Stack<Node>) funcNode.nodeStk.clone();
+        if(nodeStkB.isEmpty()){
+            pfTermList.add(funcNode.operand);
+        }
+        while (!nodeStkB.isEmpty()){
+            if(nodeStkB.peek().operand!=null){
+                pfTermList.add(nodeStkB.peek().operand);
+            }
+            else{
+                pfTermList.addAll(nodeToPfTermList(nodeStkB.peek()));
+            }
+            nodeStkB.pop();
+        }
+        if(!nodeStkB.isEmpty()){
+            pfTermList.add(funcNode.operator);
+        }
+        return pfTermList;
+    }
+
+    private Function simplify(Function func){
+        Node simpleNode = func.getFuncNode().simplify();
+        return new Function(simpleNode);
+    }
+
     public double evaluate(double value){
-        //TODO: evaluation based on var
         double result = 0;
         Stack<Double> stk = new Stack<Double>();
         for(Term term: this.pfTermList){
@@ -124,7 +153,7 @@ public class Function {
                 stk.pop();
                 Double operandB = stk.peek();
                 stk.pop();
-                Double operation = switch (term.getOperandType()) {
+                Double operation = switch (term.getOperatorType()) {
                     case ADD -> operandB + operandA;
                     case SUBTRACT -> operandB - operandA;
                     case MULTIPLY -> operandB * operandA;
@@ -137,24 +166,84 @@ public class Function {
         return stk.peek();
     }
 
-    public void initFuncWifStr(String ifFunctionStr){
+    public Function derivative(){
+        //Simplification
+        Node nodePrime = this.funcNode.simplify().derivative();
+        //Start with outermost operand, determine rule
+        //Follow rules for nodes based on rule
+        //Perform clean up
+        Function funcPrime = new Function(nodePrime);
+        funcPrime = funcPrime.simplify(funcPrime);
+        return funcPrime;
+    }
+
+    public String pfListToString(){
+        StringBuilder str = new StringBuilder();
+        for(Term term: this.pfTermList){
+            str.append(term.getTerm());
+            str.append(" ");
+        }
+        return str.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "Function{" +
+                "NEG_PRETERMS=" + NEG_PRETERMS +
+                ", ifFunctionStr='" + ifFunctionStr + '\'' +
+                ", pfTermList=" + pfTermList +
+                ", funcNode=" + funcNode +
+                '}';
+    }
+
+    public ArrayList<TermType> getNEG_PRETERMS() {
+        return NEG_PRETERMS;
+    }
+
+    public String getIfFunctionStr() {
+        return ifFunctionStr;
+    }
+
+    public ArrayList<Term> getPfTermList() {
+        return pfTermList;
+    }
+
+    public Node getFuncNode() {
+        return funcNode;
+    }
+
+    Function(String ifFunctionStr){
         this.ifFunctionStr = ifFunctionStr;
         //Parse ifFunctionStr into terms
         ArrayList<Term> ifTermsList = parseIfFunctionStr(ifFunctionStr);
         //Translate ifTermsList to pfTermsList
         //Assign to function term list
         this.pfTermList = inFixToPostFix(ifTermsList);
+        //Create function node
+        this.funcNode = new Node(this.pfTermList);
     }
 
-    public void initFuncWpfList(ArrayList<Term> pfTermList){
-        this.pfTermList = pfTermList;
+    Function(Node funcNode){
+        this.funcNode = funcNode;
+        this.pfTermList = nodeToPfTermList(funcNode);
     }
+
+    Function(ArrayList<Term> pfTermList){
+        this.pfTermList = pfTermList;
+        this.funcNode = new Node(this.pfTermList);
+    }
+
+    Function(){}
 
     public static void main(String[] args) {
         try {
-            Function func = new Function();
-            func.initFuncWifStr("x^2+2*x+52");
-            System.out.println(func.evaluate(4.5));
+            //TODO: add 3x as an alternate to 3*x, add trig functions, add log and ln function, add constants pi and e, absolute value
+            Function func = new Function("(3+x)*x");
+            System.out.println(func.pfListToString());
+            System.out.println(func.evaluate(2));
+            Function funcPrime = func.derivative();
+            System.out.println(funcPrime.pfListToString());
+            System.out.println(funcPrime.evaluate(2));
         } catch (Exception e) {
             e.printStackTrace();
         }

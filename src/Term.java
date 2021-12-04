@@ -2,34 +2,35 @@ public class Term {
     TermType termType = null;
     String term = null;
     Double value = null;
-    OperandType operandType = null;
+    OperatorType operatorType = null;
 
-    public Double getValue(){
-        return this.value;
+    public TermType getTermType() {
+        return termType;
     }
 
-    public String getTermStr(){
-        return this.term;
+    public String getTerm() {
+        return term;
     }
 
-    public OperandType getOperandType(){
-        return this.operandType;
+    public Double getValue() {
+        return value;
     }
 
-    public TermType getTermType(){
-        return this.termType;
+    public OperatorType getOperatorType() {
+        return operatorType;
     }
 
-    public String toString(){
-        StringBuilder termStr = new StringBuilder();
-        termStr.append("Term: ").append(this.term).append("\n");
-        termStr.append("TermType: ").append(this.termType).append("\n");
-        termStr.append("Value: ").append(this.value).append("\n");
-        termStr.append("OperandType: ").append(this.operandType).append("\n");
-        return termStr.toString();
+    @Override
+    public String toString() {
+        return "Term{" +
+                "termType=" + termType +
+                ", term='" + term + '\'' +
+                ", value=" + value +
+                ", operandType=" + operatorType +
+                '}';
     }
 
-    public Term(String term){
+    Term(String term){
         this.term = term;
         if(term.contains("x")){
             if(term.charAt(0)=='-'){
@@ -59,12 +60,12 @@ public class Term {
         }
         else{
             this.termType = TermType.OPERATOR;
-            operandType = switch (term.charAt(0)) {
-                case '+' -> OperandType.ADD;
-                case '-' -> OperandType.SUBTRACT;
-                case '*' -> OperandType.MULTIPLY;
-                case '/' -> OperandType.DIVIDE;
-                case '^' -> OperandType.POWER;
+            operatorType = switch (term.charAt(0)) {
+                case '+' -> OperatorType.ADD;
+                case '-' -> OperatorType.SUBTRACT;
+                case '*' -> OperatorType.MULTIPLY;
+                case '/' -> OperatorType.DIVIDE;
+                case '^' -> OperatorType.POWER;
                 default -> null;
             };
         }

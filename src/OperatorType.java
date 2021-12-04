@@ -1,4 +1,4 @@
-public enum OperandType {
+public enum OperatorType {
     ADD,
     SUBTRACT,
     MULTIPLY,
